@@ -22,15 +22,11 @@ As we're not trying to clone the "top" command (it would be meaningless), we sha
 	* Memory usage
 	* CPU usage
 	* Description
-2. Split processes according to their status:
-	* Running
-	* Sleeping
-	* Stopped
-	* Zombie
+2. Inform if a process is waiting too long to be running
 3. Inform CPU usage on user processes and system processes
 4. Show general RAM and SWAP memory usage
 5. Provide the possibility to change a process priority
-6. Average CPU usage on the last 5, 10 and 15 minutes
+6. Load average on the last 1, 5 and 15 minutes
 7. Highlight the most CPU consumer process
 
 # Strategy
