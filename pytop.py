@@ -28,20 +28,12 @@ try:
 except ImportError:
     sys.exit('==> Your OS is not supported. Please check https://github.com/gabriel-milan/PyTop for further information.')
 
-# Initial line number
+# Initial global vars
 line_number = 0
 this_user = getpass.getuser()
 cpu_cores = psutil.cpu_count()
-procs = []
-proc_model = dict([
-    ('pid', 000000),            # Unique ID
-    ('username', 'user'),       # Owner
-    ('nice', -1),               # Priority
-    ('memory_percent', 0.0),    # Memory usage
-    ('cpu_percent', 0.0),       # CPU usage
-    ('name', 'description'),    # Description
-    ('status', 'status'),       # For splitting processes according to their status
-])
+procs_cpu_average = dict()
+average_number = 10
 
 header_message = "PyTop v1.0 - https://github.com/gabriel-milan/PyTop"
 
@@ -88,9 +80,8 @@ def readable_bytes(n_bytes):
 # Function that returns processes and information about them
 def get_processes_info(interval):
 
-    global procs
-    global cpu_cores
-    global proc_model
+    global average_number
+    global procs_cpu_average
 
     # Sleeps for "interval"
     time.sleep(interval)
@@ -109,17 +100,27 @@ def get_processes_info(interval):
         except:
             pass
         else:
+            if (p.pid in procs_cpu_average):
+                if (len(procs_cpu_average[p.pid]) >= average_number):
+                    procs_cpu_average[p.pid].pop(0)
+                else:
+                    procs_cpu_average[p.pid].append(p.dict['cpu_percent'])
+            else:
+                procs_cpu_average[p.pid] = [p.dict['cpu_percent']]
             procs.append(p)
     # Sorts by CPU usage
-    processes = sorted(procs, key=lambda p: p.dict['cpu_percent'],
+    processes = sorted(procs, key=lambda p: sum(procs_cpu_average[p.pid]),
                        reverse=True)
     return (processes)
 
 # Procedure that prints system-related information
 def print_header(procs):
+
     global this_user
     global cpu_cores
     global header_message
+    global average_number
+    global procs_cpu_average
 
     # Function that returns the no. of pipeline characters and space characters (max. of 40)
     def count_pipelines(perc):
@@ -136,13 +137,13 @@ def print_header(procs):
     for proc in procs:
         try:
             if (proc.username() == this_user):
-                user_cpu_usage += proc.cpu_percent()
+                user_cpu_usage += sum(procs_cpu_average[proc.pid])
             else:
-                sys_cpu_usage += proc.cpu_percent()
+                sys_cpu_usage += sum(procs_cpu_average[proc.pid])
         except:
             pass
-    sys_cpu_usage /= cpu_cores
-    user_cpu_usage /= cpu_cores
+    sys_cpu_usage /= (cpu_cores * average_number)
+    user_cpu_usage /= (cpu_cores * average_number)
     curses_print(" CPU (User) [%s] %5s%%" % (count_pipelines(user_cpu_usage), round(user_cpu_usage, 2)))
     curses_print(" CPU (Syst) [%s] %5s%%" % (count_pipelines(sys_cpu_usage), round(sys_cpu_usage, 2)))
 
@@ -193,7 +194,7 @@ def refresh_window(procs):
             proc.username()[:16],
             proc.dict['nice'],
             round(proc.memory_percent(), 2),
-            round(proc.cpu_percent() / cpu_cores, 2),
+            round(sum(procs_cpu_average[proc.pid]) / average_number / cpu_cores, 2),
             proc.name() [:20]
         )
         try:
