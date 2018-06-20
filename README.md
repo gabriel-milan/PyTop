@@ -22,7 +22,7 @@ As we're not trying to clone the "top" command (it would be meaningless), we sha
 	* Memory usage
 	* CPU usage
 	* Description
-2. Inform if a process is waiting too long to be running
+2. Inform if a process is waiting too long to be running [NOT IMPLEMENTED!]
 3. Inform CPU usage on user processes and system processes
 4. Show general RAM and SWAP memory usage
 5. Provide the possibility to change a process priority
