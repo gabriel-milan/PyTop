@@ -17,6 +17,7 @@ import os                                       # Gets LoadAvg
 import sys                                      # Exiting the script if requirements are not satisfied
 import time                                     # Sleeping
 import atexit                                   # Running scripts before exiting
+import _thread                                  # Getting user input by making a thread
 import getpass                                  # Gets the username
 import datetime                                 # Gets now() time
 try:
@@ -28,13 +29,18 @@ try:
 except ImportError:
     sys.exit('==> Your OS is not supported. Please check https://github.com/gabriel-milan/PyTop for further information.')
 
-# Initial global vars
+# Global vars
 line_number = 0
+procs_cpu_average = dict()
+change_priority_status = 0                      # Define [0] to print a message waiting, [1] to get the PID from user and [2] to get the priority
+user_input = []                                 # Keeps the user input here
+change_pid = 0
+change_priority = 0
+
+# Global constants
 this_user = getpass.getuser()
 cpu_cores = psutil.cpu_count()
-procs_cpu_average = dict()
 average_number = 10
-
 header_message = "PyTop v1.0 - https://github.com/gabriel-milan/PyTop"
 
 # Procedure to terminate a curses application
@@ -63,6 +69,7 @@ def curses_print(line, invert_colors=False):
 
 # Procedure to start curses application
 curses_scr = curses.initscr()
+curses.noecho()
 atexit.register(terminate_curses)
 
 # Function that returns a readable type of bytes
@@ -121,6 +128,7 @@ def print_header(procs):
     global header_message
     global average_number
     global procs_cpu_average
+    global change_priority_status
 
     # Function that returns the no. of pipeline characters and space characters (max. of 40)
     def count_pipelines(perc):
@@ -177,6 +185,18 @@ def print_header(procs):
         % (av1, av2, av3, str(uptime).split('.')[0])
     curses_print(line)
 
+    # Prints the "waiting for character" line
+    curses_print("")
+    if (change_priority_status == 0):
+        curses_print (" Press [c] to change the priority of a process by its PID", invert_colors=True)
+    elif (change_priority_status == 1):
+        curses_print (" Which process do you want to change priority? PID: " + "".join(user_input), invert_colors=True)
+    elif (change_priority_status == 2):
+        curses_print (" What priority to set? It can be a value from -20 to 20,", invert_colors=True)
+        curses_print (" the lower the value, the higher priority > " + "".join(user_input), invert_colors=True)
+    else:
+        change_priority_status = 0
+
 # Procedure that refreshes curses window
 def refresh_window(procs):
 
@@ -188,29 +208,88 @@ def refresh_window(procs):
     print_header(procs)
     curses_print("")
     curses_print(header, invert_colors=True)
+    try:
+        for proc in procs:
+            line = templ % (
+                proc.pid,
+                proc.username()[:16],
+                proc.dict['nice'],
+                round(proc.memory_percent(), 2),
+                round(sum(procs_cpu_average[proc.pid]) / average_number / cpu_cores, 2),
+                proc.name() [:20]
+            )
+            try:
+                curses_print(line)
+            except curses.error:
+                break
+            curses_scr.refresh()
+    except:
+        pass
+
+# Thread to get user inputs
+def input_thread ():
+    global user_input
+    c = curses_scr.getkey()
+    user_input.append(c)
+    _thread.exit()
+    return
+
+# Procedure to change process priority
+def change_process_priority (procs, pid, priority):
+    global user_input
     for proc in procs:
-        line = templ % (
-            proc.pid,
-            proc.username()[:16],
-            proc.dict['nice'],
-            round(proc.memory_percent(), 2),
-            round(sum(procs_cpu_average[proc.pid]) / average_number / cpu_cores, 2),
-            proc.name() [:20]
-        )
-        try:
-            curses_print(line)
-        except curses.error:
-            break
-        curses_scr.refresh()
+        if proc.pid == pid:
+            proc.nice(priority)
+            user_input = ['TESTE']
+    return
 
 # Main function
 def main():
+
+    global user_input
+    global change_pid
+    global change_priority
+    global change_priority_status
+
     try:
-        interval = 0
-        while True:
+        interval = 0.1
+        create_thread = True
+        while (True):
+            if (create_thread == True):
+                _thread.start_new_thread(input_thread, ())
+                create_thread = False
             procs = get_processes_info(interval)
             refresh_window(procs)
-            interval = 0.1
+            if (len(user_input) > 0):
+                if (change_priority_status == 0):
+                    if ((user_input[0] == 'C') or (user_input[0] == 'c')):
+                        change_priority_status = 1
+                    user_input = []
+                    create_thread = True
+                elif (change_priority_status == 1):
+                    if (user_input[-1] == '\n'):
+                        change_priority_status = 2
+                        change_pid = int("".join(user_input))
+                        user_input = []
+                    elif (user_input[-1] == '\x7f'):
+                        user_input = user_input[:-2]
+                    elif (user_input[-1].isdigit() == False):
+                        user_input = user_input[:-1]
+                    create_thread = True
+                elif (change_priority_status == 2):
+                    if (user_input[-1] == '\n'):
+                        change_priority_status = 0
+                        change_priority = int("".join(user_input))
+                        change_process_priority(procs, change_pid, change_priority)
+                        user_input = []
+                    elif (user_input[-1] == '\x7f'):
+                        user_input = user_input[:-2]
+                    elif (user_input[-1].isdigit() == False):
+                        if (len(user_input) > 1):
+                            user_input = user_input[:-1]
+                        elif (user_input[-1] != '-'):
+                            user_input = user_input[:-1]
+                    create_thread = True
     except (KeyboardInterrupt, SystemExit):
         pass
 
