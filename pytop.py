@@ -16,6 +16,7 @@
 import os                                       # Gets LoadAvg
 import sys                                      # Exiting the script if requirements are not satisfied
 import time                                     # Sleeping
+import ctypes
 import atexit                                   # Running scripts before exiting
 import _thread                                  # Getting user input by making a thread
 import getpass                                  # Gets the username
@@ -202,9 +203,9 @@ def refresh_window(procs):
 
     global cpu_cores
 
-    templ = "%-10s %-16s %6s %8s %8s %20s"
+    templ = "%-10s %-16s %6s %8s %8s %20s %8s"
     curses_scr.erase()
-    header = templ % ("PID", "Owner", "Prior", "%Mem", "%CPU", "Description")
+    header = templ % ("PID", "Owner", "Prior", "%Mem", "%CPU", "Description", "Status")
     print_header(procs)
     curses_print("")
     curses_print(header, invert_colors=True)
@@ -216,7 +217,8 @@ def refresh_window(procs):
                 proc.dict['nice'],
                 round(proc.memory_percent(), 2),
                 round(sum(procs_cpu_average[proc.pid]) / average_number / cpu_cores, 2),
-                proc.name() [:20]
+                proc.name() [:20],
+                proc.dict['status']
             )
             try:
                 curses_print(line)
@@ -250,6 +252,15 @@ def main():
     global change_pid
     global change_priority
     global change_priority_status
+
+    import ctypes, os
+    try:
+        is_admin = os.getuid() == 0
+    except AttributeError:
+        is_admin = ctypes.windll.shell32.IsUserAnAdmin() != 0
+    if (is_admin == False):
+        print ("==> Please run with admin privileges!")
+        return
 
     try:
         interval = 0.1
