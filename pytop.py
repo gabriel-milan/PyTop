@@ -203,9 +203,9 @@ def refresh_window(procs):
 
     global cpu_cores
 
-    templ = "%-10s %-16s %6s %8s %8s %20s %8s"
+    templ = "%-10s %-16s %6s %8s %8s %20s"
     curses_scr.erase()
-    header = templ % ("PID", "Owner", "Prior", "%Mem", "%CPU", "Description", "Status")
+    header = templ % ("PID", "Owner", "Prior", "%Mem", "%CPU", "Description")
     print_header(procs)
     curses_print("")
     curses_print(header, invert_colors=True)
@@ -218,7 +218,6 @@ def refresh_window(procs):
                 round(proc.memory_percent(), 2),
                 round(sum(procs_cpu_average[proc.pid]) / average_number / cpu_cores, 2),
                 proc.name() [:20],
-                proc.dict['status']
             )
             try:
                 curses_print(line)
